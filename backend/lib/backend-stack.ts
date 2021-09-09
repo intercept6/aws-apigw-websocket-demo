@@ -1,11 +1,12 @@
-import { Stack, Construct, StackProps, CfnOutput } from '@aws-cdk/core';
+import { CfnOutput, Construct, Stack, StackProps } from '@aws-cdk/core';
 import { WebSocketApi, WebSocketStage } from '@aws-cdk/aws-apigatewayv2';
 import { LambdaWebSocketIntegration } from '@aws-cdk/aws-apigatewayv2-integrations';
 import { NodejsFunction } from '@aws-cdk/aws-lambda-nodejs';
 import { PolicyStatement } from '@aws-cdk/aws-iam';
-import { AthenaStartQueryExecution, AthenaGetQueryResults, LambdaInvoke } from '@aws-cdk/aws-stepfunctions-tasks';
+import { AthenaGetQueryResults, AthenaStartQueryExecution, LambdaInvoke } from '@aws-cdk/aws-stepfunctions-tasks';
 import { IntegrationPattern, JsonPath, StateMachine } from '@aws-cdk/aws-stepfunctions';
 import { Bucket } from '@aws-cdk/aws-s3';
+import { Tracing } from '@aws-cdk/aws-lambda';
 
 
 export class BackendStack extends Stack {
@@ -38,7 +39,8 @@ export class BackendStack extends Stack {
     });
 
     const pushResultFn = new NodejsFunction(this, 'PushResultFn', {
-      entry: 'src/result-push.ts'
+      entry: 'src/push-result.ts',
+      tracing: Tracing.ACTIVE
     });
     const pushResultJob = new LambdaInvoke(this, 'PushResult', {
       lambdaFunction: pushResultFn
@@ -51,6 +53,7 @@ export class BackendStack extends Stack {
 
     const queryFn = new NodejsFunction(this, 'QueryFn', {
       entry: 'src/query.ts',
+      tracing: Tracing.ACTIVE,
       environment: {
         STATE_MACHINE_ARN: stateMachine.stateMachineArn
       }
