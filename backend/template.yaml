@@ -1,0 +1,398 @@
+Resources:
+  StateMachineRoleB840431D:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                Fn::Join:
+                  - ""
+                  - - states.
+                    - Ref: AWS::Region
+                    - .amazonaws.com
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: BackendStack/StateMachine/Role/Resource
+  StateMachineRoleDefaultPolicyDF1E6607:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - athena:getDataCatalog
+              - athena:startQueryExecution
+              - athena:getQueryExecution
+            Effect: Allow
+            Resource:
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":athena:"
+                    - Ref: AWS::Region
+                    - ":"
+                    - Ref: AWS::AccountId
+                    - :datacatalog/AwsDataCatalog
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":athena:"
+                    - Ref: AWS::Region
+                    - ":"
+                    - Ref: AWS::AccountId
+                    - :workgroup/primary
+          - Action:
+              - s3:CreateBucket
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              - s3:GetObject
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - s3:AbortMultipartUpload
+              - s3:ListBucketMultipartUploads
+              - s3:ListMultipartUploadParts
+              - s3:PutObject
+            Effect: Allow
+            Resource: "*"
+          - Action: lakeformation:GetDataAccess
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - glue:BatchCreatePartition
+              - glue:BatchDeletePartition
+              - glue:BatchDeleteTable
+              - glue:BatchGetPartition
+              - glue:CreateDatabase
+              - glue:CreatePartition
+              - glue:CreateTable
+              - glue:DeleteDatabase
+              - glue:DeletePartition
+              - glue:DeleteTable
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetPartition
+              - glue:GetPartitions
+              - glue:GetTable
+              - glue:GetTables
+              - glue:UpdateDatabase
+              - glue:UpdatePartition
+              - glue:UpdateTable
+            Effect: Allow
+            Resource:
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":glue:"
+                    - Ref: AWS::Region
+                    - ":"
+                    - Ref: AWS::AccountId
+                    - :catalog
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":glue:"
+                    - Ref: AWS::Region
+                    - ":"
+                    - Ref: AWS::AccountId
+                    - :database/default
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":glue:"
+                    - Ref: AWS::Region
+                    - ":"
+                    - Ref: AWS::AccountId
+                    - :table/default/*
+              - Fn::Join:
+                  - ""
+                  - - "arn:"
+                    - Ref: AWS::Partition
+                    - ":glue:"
+                    - Ref: AWS::Region
+                    - ":"
+                    - Ref: AWS::AccountId
+                    - :userDefinedFunction/default/*
+          - Action: athena:getQueryResults
+            Effect: Allow
+            Resource: "*"
+          - Action: s3:GetObject
+            Effect: Allow
+            Resource: "*"
+        Version: "2012-10-17"
+      PolicyName: StateMachineRoleDefaultPolicyDF1E6607
+      Roles:
+        - Ref: StateMachineRoleB840431D
+    Metadata:
+      aws:cdk:path: BackendStack/StateMachine/Role/DefaultPolicy/Resource
+  StateMachine2E01A3A5:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      RoleArn:
+        Fn::GetAtt:
+          - StateMachineRoleB840431D
+          - Arn
+      DefinitionString:
+        Fn::Join:
+          - ""
+          - - '{"StartAt":"StartAthenaQuery","States":{"StartAthenaQuery":{"Next":"GetAthenaQueryResult","Type":"Task","Resource":"arn:'
+            - Ref: AWS::Partition
+            - ":states:::athena:startQueryExecution\",\"Parameters\":{\"QueryString\":\"SELECT * FROM cloudtrail_logs_partition_projection WHERE eventname = 'CreateTable' AND  region = 'ap-northeast-1' AND date BETWEEN '2021/08/01' AND '2021/09/01';\",\"QueryExecutionContext\":{},\"ResultConfiguration\":{}}},\"GetAthenaQueryResult\":{\"End\":true,\"Type\":\"Task\",\"Resource\":\"arn:"
+            - Ref: AWS::Partition
+            - :states:::athena:getQueryResults","Parameters":{"QueryExecutionId":"$.QueryExecution.QueryExecutionId"}}}}
+    DependsOn:
+      - StateMachineRoleDefaultPolicyDF1E6607
+      - StateMachineRoleB840431D
+    Metadata:
+      aws:cdk:path: BackendStack/StateMachine/Resource
+  QueryFnServiceRoleF1C814DC:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: BackendStack/QueryFn/ServiceRole/Resource
+  QueryFnServiceRoleDefaultPolicyCC7ECEB2:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: execute-api:ManageConnections
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - "arn:aws:execute-api:"
+                  - Ref: AWS::Region
+                  - ":"
+                  - Ref: AWS::AccountId
+                  - ":"
+                  - Ref: WebSocketApi34BCF99B
+                  - /*
+        Version: "2012-10-17"
+      PolicyName: QueryFnServiceRoleDefaultPolicyCC7ECEB2
+      Roles:
+        - Ref: QueryFnServiceRoleF1C814DC
+    Metadata:
+      aws:cdk:path: BackendStack/QueryFn/ServiceRole/DefaultPolicy/Resource
+  QueryFnB2E9AD3D:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Ref: AssetParametersb370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59faS3Bucket988B2B82
+        S3Key:
+          Fn::Join:
+            - ""
+            - - Fn::Select:
+                  - 0
+                  - Fn::Split:
+                      - "||"
+                      - Ref: AssetParametersb370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59faS3VersionKey3E29C75B
+              - Fn::Select:
+                  - 1
+                  - Fn::Split:
+                      - "||"
+                      - Ref: AssetParametersb370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59faS3VersionKey3E29C75B
+      Role:
+        Fn::GetAtt:
+          - QueryFnServiceRoleF1C814DC
+          - Arn
+      Environment:
+        Variables:
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - QueryFnServiceRoleDefaultPolicyCC7ECEB2
+      - QueryFnServiceRoleF1C814DC
+    Metadata:
+      aws:cdk:path: BackendStack/QueryFn/Resource
+      aws:asset:path: asset.b370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59fa
+      aws:asset:property: Code
+  WebSocketApi34BCF99B:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: WebSocketApi
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+    Metadata:
+      aws:cdk:path: BackendStack/WebSocketApi/Resource
+  WebSocketApiqueryRouteBackendStackWebSocketApiqueryRouteA14C703EPermission52007E85:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - QueryFnB2E9AD3D
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:"
+            - Ref: AWS::Partition
+            - ":execute-api:"
+            - Ref: AWS::Region
+            - ":"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: WebSocketApi34BCF99B
+            - /*/*query
+    Metadata:
+      aws:cdk:path: BackendStack/WebSocketApi/query-Route/BackendStackWebSocketApiqueryRouteA14C703E-Permission
+  WebSocketApiqueryRouteWebSocketIntegrationb3f62927bbdaa6b2aa13b5d3e424f14917535B29:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: WebSocketApi34BCF99B
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Join:
+          - ""
+          - - "arn:"
+            - Ref: AWS::Partition
+            - ":apigateway:"
+            - Ref: AWS::Region
+            - :lambda:path/2015-03-31/functions/
+            - Fn::GetAtt:
+                - QueryFnB2E9AD3D
+                - Arn
+            - /invocations
+    Metadata:
+      aws:cdk:path: BackendStack/WebSocketApi/query-Route/WebSocketIntegration-b3f62927bbdaa6b2aa13b5d3e424f149/Resource
+  WebSocketApiqueryRoute7834A199:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: WebSocketApi34BCF99B
+      RouteKey: query
+      Target:
+        Fn::Join:
+          - ""
+          - - integrations/
+            - Ref: WebSocketApiqueryRouteWebSocketIntegrationb3f62927bbdaa6b2aa13b5d3e424f14917535B29
+    Metadata:
+      aws:cdk:path: BackendStack/WebSocketApi/query-Route/Resource
+  WebSocketApiDevStageAAD38A38:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId:
+        Ref: WebSocketApi34BCF99B
+      StageName: dev
+      AutoDeploy: true
+    Metadata:
+      aws:cdk:path: BackendStack/WebSocketApiDevStage/Resource
+  CDKMetadata:
+    Type: AWS::CDK::Metadata
+    Properties:
+      Analytics: v2:deflate64:H4sIAAAAAAAA/11RTVPCMBD9Ld7TYGHGs8Co40HFcvAc0qWEtkknuwGZTP67SQqonHbf2923XyUvpyW/v3sURyxk3U68NBa4X5OQLZsjAkW3UbphS6ORrJPEllu9Elb0QGAT+HA0uExXgMZZCcmP+bUiZXRgSdwjwbB1WiYKCxLYIvdz2oEWsYWlTwf29PQN0qUMNkZeYOSjsOsIA/unkuckeBNyp3Ru+hcHpkTPfWW6HMp2ZTolT3mD7AXWiX5Ti0KbGvbI37N5PjdgOCtEugHyfIqI+cLJFmghEM6l3Ee1a0VSBtsrxHHzQTVxoqM4Habcf8FmbVL5fFApM5krVxlH8AtfNUFjxUX0Bt4kpx9d9m8ghMDSPnyPk0P5wGfxwXtUqrBOk+qBV6P9AUlPOm39AQAA
+    Metadata:
+      aws:cdk:path: BackendStack/CDKMetadata/Default
+    Condition: CDKMetadataAvailable
+Parameters:
+  AssetParametersb370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59faS3Bucket988B2B82:
+    Type: String
+    Description: S3 bucket for asset "b370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59fa"
+  AssetParametersb370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59faS3VersionKey3E29C75B:
+    Type: String
+    Description: S3 key for asset version "b370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59fa"
+  AssetParametersb370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59faArtifactHashD0D4D0C5:
+    Type: String
+    Description: Artifact hash for asset "b370d728ece6b7fd510bbc8d6cc299ffdbb2d476d89d1b21ee5b8854f62b59fa"
+Outputs:
+  Url:
+    Value:
+      Fn::GetAtt:
+        - WebSocketApi34BCF99B
+        - ApiEndpoint
+Conditions:
+  CDKMetadataAvailable:
+    Fn::Or:
+      - Fn::Or:
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - af-south-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-east-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-northeast-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-northeast-2
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-south-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-southeast-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ap-southeast-2
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - ca-central-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - cn-north-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - cn-northwest-1
+      - Fn::Or:
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-central-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-north-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-south-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-west-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-west-2
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - eu-west-3
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - me-south-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - sa-east-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - us-east-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - us-east-2
+      - Fn::Or:
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - us-west-1
+          - Fn::Equals:
+              - Ref: AWS::Region
+              - us-west-2
