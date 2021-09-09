@@ -37,7 +37,9 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
   await apiGwClient.send(new PostToConnectionCommand({
     ConnectionId: connectionId,
     // @ts-ignore
-    Data: `Processing started with execution ARN: ${output.executionArn}`
+    Data: JSON.stringify({
+      message: `Processing started with execution ARN: ${output.executionArn}`
+    })
   }))
 
   return {
